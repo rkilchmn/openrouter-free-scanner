@@ -1,0 +1,22 @@
+[project]
+name = "openrouterfreescanner"
+version = "1.0.0"
+authors = [
+  { name="tcsenpai", email="tcsenpai@discus.sh" },
+]
+description = "CLI and programmatically fetcher for open router current free models with advanced filtering."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/tcsenpai/openrouter-free-scanner"
+"Bug Tracker" = "https://github.com/tcsenpai/openrouter-free-scanner/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
