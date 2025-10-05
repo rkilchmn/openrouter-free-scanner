@@ -7,6 +7,9 @@ authors = [
 description = "CLI and programmatically fetcher for open router current free models with advanced filtering."
 readme = "README.md"
 requires-python = ">=3.8"
+dependencies = [
+    "requests",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -16,6 +19,9 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/tcsenpai/openrouter-free-scanner"
 "Bug Tracker" = "https://github.com/tcsenpai/openrouter-free-scanner/issues"
+
+[project.scripts]
+openrouter-free-scanner = "openrouterfreescanner.main:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
