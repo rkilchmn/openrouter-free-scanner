@@ -28,7 +28,7 @@ def get_free_models(exclude_routers=True):
         print(f"An error occurred: {e}")
         return None
 
-def filter_models(models, name=None, min_context_length=None, provider=None):
+def filter_models(models, name=None, min_context_length=None, provider=None, required_parameters=None):
     """
     Filters a list of models based on specified criteria.
 
@@ -37,6 +37,7 @@ def filter_models(models, name=None, min_context_length=None, provider=None):
         name (str, optional): The name to filter by (case-insensitive).
         min_context_length (int, optional): The minimum context length to filter by.
         provider (str, optional): The provider to filter by (case-insensitive).
+        required_parameters (list, optional): List of parameter names that must be supported by the model.
 
     Returns:
         list: The filtered list of models.
@@ -51,6 +52,13 @@ def filter_models(models, name=None, min_context_length=None, provider=None):
 
     if provider:
         filtered_models = [model for model in filtered_models if provider.lower() in model.get("id", "").lower().split("/")[0]]
+    
+    if required_parameters:
+        filtered_models = [
+            model for model in filtered_models 
+            if all(param in model.get('supported_parameters', []) 
+                  for param in required_parameters)
+        ]
 
     return filtered_models
 
@@ -75,6 +83,7 @@ def main():
     parser.add_argument("--name", type=str, help="Filter models by name.")
     parser.add_argument("--min-context-length", type=int, help="Filter by minimum context length.")
     parser.add_argument("--provider", type=str, help="Filter by provider.")
+    parser.add_argument("--require-params", type=str, help="Comma-separated list of required parameters (e.g., 'tool_choice,tools')")
     parser.add_argument("--sort-by", type=str, default="name", help="Sort models by a specific field (e.g., name, context_length).")
     parser.add_argument("--reverse", action="store_true", help="Reverse the sort order.")
     args = parser.parse_args()
@@ -82,7 +91,19 @@ def main():
     models = get_free_models()
 
     if models:
-        models = filter_models(models, name=args.name, min_context_length=args.min_context_length, provider=args.provider)
+        # Parse required parameters
+        required_params = None
+        if args.require_params:
+            required_params = [p.strip() for p in args.require_params.split(',') if p.strip()]
+            print(f"Requiring models to support parameters: {', '.join(required_params)}")
+            
+        models = filter_models(
+            models, 
+            name=args.name, 
+            min_context_length=args.min_context_length, 
+            provider=args.provider,
+            required_parameters=required_params
+        )
         models = sort_models(models, sort_by=args.sort_by, reverse=args.reverse)
 
         if args.limit:

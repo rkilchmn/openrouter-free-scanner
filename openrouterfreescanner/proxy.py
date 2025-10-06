@@ -2,7 +2,7 @@ import argparse
 import json
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 import requests
 from .main import get_free_models, filter_models, sort_models
 
@@ -192,6 +192,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                         # No more models to try
                         self.send_response(response.status_code)
                         self.send_header('Content-Type', 'application/json')
+                        self.send_header('Content-Length', str(len(response.content)))
                         self.end_headers()
                         self.wfile.write(response.content)
                         return
@@ -200,12 +201,18 @@ class ProxyHandler(BaseHTTPRequestHandler):
                     if response.status_code == 200:
                         self.model_stats.record_success(best_model['id'])
                         self.log_message(f"Success with model: {best_model['id']}")
+                    else:   
+                        self.log_message(f"Failed with model: {best_model['id']} response code: {response.status_code} response text: {response.text}")
                     
                     # Forward response to client
                     self.send_response(response.status_code)
                     for header, value in response.headers.items():
-                        if header.lower() not in ['transfer-encoding', 'connection']:
+                        # Skip headers that shouldn't be forwarded
+                        # content-encoding is excluded because requests library already decompresses response.content
+                        if header.lower() not in ['transfer-encoding', 'connection', 'content-encoding', 'content-length']:
                             self.send_header(header, value)
+                    # Set correct content-length for the actual (decompressed) content
+                    self.send_header('Content-Length', str(len(response.content)))
                     self.end_headers()
                     self.wfile.write(response.content)
                     return
@@ -232,7 +239,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
 def start_proxy_server(port, limit=None, name=None, min_context_length=None, 
                        provider=None, sort_by='context_length', reverse=True,
-                       error_threshold=3):
+                       error_threshold=3, required_parameters=None):
     """
     Start the OpenAI-compatible proxy server.
     
@@ -245,6 +252,7 @@ def start_proxy_server(port, limit=None, name=None, min_context_length=None,
         sort_by (str): Field to sort by
         reverse (bool): Reverse sort order
         error_threshold (int): Number of errors before switching models
+        required_parameters (list): List of parameter names that must be supported by the model
     """
     print("Fetching free models from OpenRouter...")
     models = get_free_models()
@@ -254,7 +262,13 @@ def start_proxy_server(port, limit=None, name=None, min_context_length=None,
         return
     
     # Apply filters
-    models = filter_models(models, name=name, min_context_length=min_context_length, provider=provider)
+    models = filter_models(
+        models, 
+        name=name, 
+        min_context_length=min_context_length, 
+        provider=provider,
+        required_parameters=required_parameters
+    )
     models = sort_models(models, sort_by=sort_by, reverse=reverse)
     
     if limit:
@@ -316,8 +330,16 @@ def main():
                        help="Reverse sort order (default: True)")
     parser.add_argument("--error-threshold", type=int, default=3,
                        help="Number of errors before switching models (default: 3)")
+    parser.add_argument("--require-params", type=str, 
+                       help="Comma-separated list of required parameters (e.g., 'tool_choice,tools')")
     
     args = parser.parse_args()
+    
+    # Parse required parameters
+    required_params = None
+    if args.require_params:
+        required_params = [p.strip() for p in args.require_params.split(',') if p.strip()]
+        print(f"Requiring models to support parameters: {', '.join(required_params)}")
     
     start_proxy_server(
         port=args.port,
@@ -327,7 +349,8 @@ def main():
         provider=args.provider,
         sort_by=args.sort_by,
         reverse=args.reverse,
-        error_threshold=args.error_threshold
+        error_threshold=args.error_threshold,
+        required_parameters=required_params
     )
 
 
